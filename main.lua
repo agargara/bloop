@@ -6,12 +6,12 @@ function love.load()
   love.mouse.setRelativeMode(true)
   -- global variables
   DEBUG = false
-  RECORDING = false
+  RECORDING = true
   debug_text = ""
   t = 0
   shaders = init_shaders()
   settings = init_settings()
-  current_shader = "gloop_shader"
+  current_shader = "floop_shader"
   init_scene()
   get_dimensions()
 end
@@ -32,23 +32,38 @@ function init_settings()
     time_scale_type = "linear"
   }
   local gloop_shader = {
-    bounce = true,
+    bounce = false,
     speed = 400, -- 1 is fastest
     scale = 0.1,
     min_scale = 0.01,
     max_scale = 2,
-    zoom_level = -512,
+    zoom_level = 0,
     zoom_max = 512,
-    autozoom = true,
+    autozoom = false,
     mouse_zoom = false,
     scale_movement = 0,
     time_range = 0.1,
     time_scale_type = "linear"
   }
+  local floop_shader = {
+    bounce = false,
+    speed = 400, -- 1 is fastest
+    scale = 0.1,
+    min_scale = 0.01,
+    max_scale = 4,
+    zoom_level = -356,
+    zoom_max = 512,
+    autozoom = false,
+    mouse_zoom = false,
+    scale_movement = 0,
+    time_range = 2*math.pi,
+    time_scale_type = "linear"
+  }
   local settings = {
     bloop_shader = bloop_shader,
     mono_shader = bloop_shader,
-    gloop_shader = gloop_shader
+    gloop_shader = gloop_shader,
+    floop_shader = floop_shader
   }
   return settings
 end
@@ -137,28 +152,61 @@ function init_shaders()
       }
     }
   ]]
+  local floop_shader = love.graphics.newShader[[
+    #extension GL_EXT_gpu_shader4: enable
+    extern number time;
+    extern number scale;
+    extern number screen_width;
+    extern number screen_height;
+    float linear_map (float n, float min_in, float max_in, float min_out, float max_out){
+      float in_range = max_in - min_in;
+      float out_range = max_out - min_out;
+      float normalized = (n - min_in) / in_range;
+      return (normalized*out_range) + min_out;
+    }
+    vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){
+      // Get x and y relative to center
+      float x = screen_coords.x - (screen_width * 0.5);
+      float y = screen_coords.y - (screen_height * 0.5);
+      float z = time;
+      x *= scale;
+      y *= scale;
+      float r = 1;
+      float g = r;
+      float b = r;
+      float n = cos(x) * sin(y) + cos(y)*sin(z) + cos(z)*sin(x);
+      if (int(n) == 0){
+        return vec4(r,g,b,1.0);
+      }else{
+        return vec4(1-r,1-g,1-b,1.0);
+      }
+    }
+  ]]
   local shaders = {
     mono_shader = mono_shader,
     bloop_shader = bloop_shader,
-    gloop_shader = gloop_shader
+    gloop_shader = gloop_shader,
+    floop_shader = floop_shader
   }
   return shaders
 end
 
 function love.update()
+  t = t + 1
+  local adjusted_time = (t%speed) / speed
   if (autozoom) then
     zoom_level = math.max(math.min(zoom_level + 0.5, zoom_max), -zoom_max)
     if zoom_level == zoom_max then
       RECORDING = false
     end
+  elseif (t == (speed*2)) then
+    RECORDING = false
   end
   scale = log_scale(zoom_level, -zoom_max, zoom_max, min_scale, max_scale)
   screenshotter.update(dt)
   if RECORDING then
     screenshotter.takeShot()
   end
-  t = t + 1
-  local adjusted_time = (t%speed) / speed
   if(bounce) then
     if (adjusted_time > 0.5) then
       adjusted_time = 1 - adjusted_time
@@ -174,6 +222,8 @@ function love.update()
   shaders['bloop_shader']:send("scale", scale)
   shaders['gloop_shader']:send("time", adjusted_time)
   shaders['gloop_shader']:send("scale", scale)
+  shaders['floop_shader']:send("time", adjusted_time)
+  shaders['floop_shader']:send("scale", scale)
 end
 
 function love.draw()
