@@ -18,28 +18,28 @@ end
 
 function init_settings()
   local bloop_shader = {
-    bounce = true,
-    speed = 1000, -- 1 is fastest
+    bounce = false,
+    speed = 500, -- 1 is fastest
     scale = 0.1,
     min_scale = 0.01,
     max_scale = 1,
     zoom_level = 0,
     zoom_max = 512,
     autozoom = false,
-    mouse_zoom = false,
+    mouse_zoom = true,
     scale_movement = 0,
-    time_range = 2*math.pi,
-    time_scale_type = "linear"
+    time_range = 8*math.pi,
+    time_scale_type = "log"
   }
   local gloop_shader = {
     bounce = false,
-    speed = 400, -- 1 is fastest
+    speed = 300, -- 1 is fastest
     scale = 0.1,
     min_scale = 0.01,
     max_scale = 2,
-    zoom_level = 0,
+    zoom_level = -512,
     zoom_max = 512,
-    autozoom = false,
+    autozoom = true,
     mouse_zoom = false,
     scale_movement = 0,
     time_range = 0.1,
@@ -110,7 +110,6 @@ function init_shaders()
     }
   ]]
   local bloop_shader = love.graphics.newShader[[
-    #extension GL_EXT_gpu_shader4: enable
     extern number time;
     extern number scale;
     extern number screen_width;
@@ -130,7 +129,6 @@ function init_shaders()
     }
   ]]
   local gloop_shader = love.graphics.newShader[[
-    #extension GL_EXT_gpu_shader4: enable
     extern number time;
     extern number scale;
     extern number screen_width;
@@ -153,7 +151,6 @@ function init_shaders()
     }
   ]]
   local floop_shader = love.graphics.newShader[[
-    #extension GL_EXT_gpu_shader4: enable
     extern number time;
     extern number scale;
     extern number screen_width;
@@ -234,14 +231,15 @@ function love.draw()
     love.graphics.setColor(0, 0, 0, 255)
     love.graphics.rectangle('fill', 6,6,200,22)
     love.graphics.setColor(255, 255, 255, 255)
-    love.graphics.print(debug_text, 10, 10)
+    local fps = tostring(love.timer.getFPS())
+    love.graphics.print(fps..debug_text, 10, 10)
   end
 end
 
 -- event handling
 function love.keypressed(key, scancode, isrepeat)
   if (key == 'f') then
-    love.window.setFullscreen( not love.window.getFullscreen() )
+    love.window.setFullscreen( not love.window.getFullscreen(), "exclusive")
     get_dimensions()
   elseif (key == 'd') then
     DEBUG = not DEBUG
