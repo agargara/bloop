@@ -11,7 +11,7 @@ function love.load()
   t = 0
   shaders = init_shaders()
   settings = init_settings()
-  current_shader = "floop_shader"
+  current_shader = "ploop_shader"
   init_scene()
   get_dimensions()
 end
@@ -59,11 +59,26 @@ function init_settings()
     time_range = 2*math.pi,
     time_scale_type = "linear"
   }
+  local ploop_shader = {
+    bounce = false,
+    speed = 400, -- 1 is fastest
+    scale = 0.1,
+    min_scale = 0.01,
+    max_scale = 4,
+    zoom_level = -356,
+    zoom_max = 512,
+    autozoom = false,
+    mouse_zoom = false,
+    scale_movement = 0,
+    time_range = 2*math.pi,
+    time_scale_type = "linear"
+  }
   local settings = {
     bloop_shader = bloop_shader,
     mono_shader = bloop_shader,
     gloop_shader = gloop_shader,
-    floop_shader = floop_shader
+    floop_shader = floop_shader,
+    ploop_shader = ploop_shader
   }
   return settings
 end
@@ -179,11 +194,45 @@ function init_shaders()
       }
     }
   ]]
+  local ploop_shader = love.graphics.newShader[[
+    extern float time;
+    extern number screen_width;
+    extern number screen_height;
+    #define PI 3.14159265359
+    float linear_map (float n, float min_in, float max_in, float min_out, float max_out){
+      float in_range = max_in - min_in;
+      float out_range = max_out - min_out;
+      float normalized = (n - min_in) / in_range;
+      return (normalized*out_range) + min_out;
+    }
+    // Plot a line on Y using a value between 0.0-1.0
+    // Makes a "bump" at value y
+    float plot(float old_y, float new_y){
+      return  smoothstep( new_y-0.02, new_y, old_y) - 
+              smoothstep( new_y, new_y+0.02, old_y);
+    }
+    vec4 effect( vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords ){
+      // Get x and y relative to center
+      float x = linear_map(screen_coords.x, 0, screen_width, 0, 1);
+      float y = linear_map(screen_coords.y, 0, screen_height, 0, 1);
+      
+      // the function:
+      float new_y = smoothstep(0.2, 0.5, x)-smoothstep(0.5,0.8,x); 
+      x = x * time;
+      new_y = ((fract( x / 0.42 )) * (abs( x )) * (sin( x / 0.22 )));
+      // abs(sin(x*PI));
+      vec3 new_color = vec3(new_y);
+      float pct = plot(y, new_y);
+      new_color = (1.0-pct)*new_color+pct*vec3(0.0,1.0,0.0);
+      return vec4(new_color,1.0);
+    }
+  ]]
   local shaders = {
     mono_shader = mono_shader,
     bloop_shader = bloop_shader,
     gloop_shader = gloop_shader,
-    floop_shader = floop_shader
+    floop_shader = floop_shader,
+    ploop_shader = ploop_shader
   }
   return shaders
 end
@@ -221,6 +270,7 @@ function love.update()
   shaders['gloop_shader']:send("scale", scale)
   shaders['floop_shader']:send("time", adjusted_time)
   shaders['floop_shader']:send("scale", scale)
+  --shaders['ploop_shader']:send("time", adjusted_time)
 end
 
 function love.draw()
